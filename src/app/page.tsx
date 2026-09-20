@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { sumFoods } from "@/lib/nutrition";
 import { FoodEntry, Meal } from "@/types";
 import { todayKey } from "@/lib/date";
 import * as api from "@/lib/api";
+import { upsertManualFoodItem } from "@/lib/foods";
 import TotalsSummary from "@/components/TotalsSummary";
 import MealCard from "@/components/MealCard";
 import DateNav from "@/components/DateNav";
@@ -60,7 +62,7 @@ export default function Home() {
       setMeals((m) => m.filter((meal) => meal.id !== mealId));
     });
 
-  const addFood = (mealId: string, food: Omit<FoodEntry, "id">) =>
+  const addFood = (mealId: string, food: Omit<FoodEntry, "id">, fromCatalog: boolean) =>
     runMutation(async () => {
       const created = await api.createFood(mealId, food);
       setMeals((m) =>
@@ -68,6 +70,16 @@ export default function Home() {
           meal.id === mealId ? { ...meal, foods: [...meal.foods, created] } : meal
         )
       );
+      if (!fromCatalog) {
+        upsertManualFoodItem({
+          name: food.name,
+          calories: food.calories,
+          protein: food.protein,
+          fibre: food.fibre,
+        }).catch(() => {
+          // The entry itself saved fine; syncing it into the catalog is best-effort.
+        });
+      }
     });
 
   const updateFood = (mealId: string, foodId: string, food: Omit<FoodEntry, "id">) =>
@@ -99,10 +111,16 @@ export default function Home() {
   return (
     <div className="min-h-full bg-zinc-50 dark:bg-black">
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-6 sm:max-w-lg">
-        <header>
+        <header className="flex items-center justify-between">
           <h1 className="text-xl font-semibold text-zinc-900 dark:text-zinc-50">
             Calorie Tracker
           </h1>
+          <Link
+            href="/foods"
+            className="text-sm font-medium text-zinc-500 underline-offset-2 hover:text-zinc-900 hover:underline dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Foods
+          </Link>
         </header>
 
         <DateNav date={date} onChange={setDate} />
@@ -132,7 +150,7 @@ export default function Home() {
                 meal={meal}
                 onRename={(name) => renameMeal(meal.id, name)}
                 onRemove={() => removeMeal(meal.id)}
-                onAddFood={(food) => addFood(meal.id, food)}
+                onAddFood={(food, fromCatalog) => addFood(meal.id, food, fromCatalog)}
                 onUpdateFood={(foodId, food) => updateFood(meal.id, foodId, food)}
                 onRemoveFood={(foodId) => removeFood(meal.id, foodId)}
               />

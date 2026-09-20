@@ -20,7 +20,7 @@ export default function MealCard({
   meal: Meal;
   onRename: (name: string) => void;
   onRemove: () => void;
-  onAddFood: (food: Omit<FoodEntry, "id">) => void;
+  onAddFood: (food: Omit<FoodEntry, "id">, fromCatalog: boolean) => void;
   onUpdateFood: (foodId: string, food: Omit<FoodEntry, "id">) => void;
   onRemoveFood: (foodId: string) => void;
   }) {
@@ -86,8 +86,8 @@ export default function MealCard({
       {formMode?.type === "add" && (
         <div className="mt-3">
           <FoodForm
-            onSubmit={(values) => {
-              onAddFood(values);
+            onSubmit={(values, fromCatalog) => {
+              onAddFood(values, fromCatalog);
               setFormMode(null);
             }}
             onCancel={() => setFormMode(null)}

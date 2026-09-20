@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NUTRIENT_FIELDS, NutritionTotals } from "@/lib/nutrition";
 import { FoodEntry } from "@/types";
+import { FoodItem, searchFoodItems } from "@/lib/foods";
 
 type FoodFormValues = Omit<FoodEntry, "id">;
 
@@ -24,6 +25,15 @@ function toFormValues(food?: FoodEntry): FoodFormValues {
   return rest;
 }
 
+function scaleFromCatalog(food: FoodItem, grams: number) {
+  const scale = grams / 100;
+  return {
+    calories: Math.round(food.caloriesPer100g * scale),
+    protein: Math.round(food.proteinPer100g * scale * 10) / 10,
+    fibre: Math.round(food.fibrePer100g * scale * 10) / 10,
+  };
+}
+
 const inputClasses =
   "w-full rounded-lg border border-zinc-200 bg-transparent px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:text-zinc-50 dark:focus:ring-white/10";
 
@@ -33,12 +43,35 @@ export default function FoodForm({
   onCancel,
 }: {
   initialValues?: FoodEntry;
-  onSubmit: (values: FoodFormValues) => void;
+  onSubmit: (values: FoodFormValues, fromCatalog: boolean) => void;
   onCancel: () => void;
 }) {
-  const [values, setValues] = useState<FoodFormValues>(
-    toFormValues(initialValues)
-  );
+  const isAdding = !initialValues;
+  const [values, setValues] = useState<FoodFormValues>(toFormValues(initialValues));
+  const [results, setResults] = useState<FoodItem[]>([]);
+  const [selectedFood, setSelectedFood] = useState<FoodItem | null>(null);
+  const [gramsInput, setGramsInput] = useState("");
+
+  useEffect(() => {
+    if (!isAdding || selectedFood || values.name.trim().length < 2) {
+      setResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchFoodItems(values.name.trim())
+        .then((found) => {
+          if (!cancelled) setResults(found);
+        })
+        .catch(() => {
+          if (!cancelled) setResults([]);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isAdding, selectedFood, values.name]);
 
   const setNutrient = (key: keyof NutritionTotals, raw: string) => {
     setValues((v) => ({ ...v, [key]: raw === "" ? 0 : Number(raw) }));
@@ -47,6 +80,29 @@ export default function FoodForm({
   const nutrientDisplay = (key: keyof NutritionTotals) =>
     values[key] === 0 ? "" : String(values[key]);
 
+  const pickFood = (food: FoodItem) => {
+    setSelectedFood(food);
+    setResults([]);
+    setGramsInput("");
+    setValues((v) => ({ ...v, name: food.name }));
+  };
+
+  const clearSelection = () => {
+    setSelectedFood(null);
+    setGramsInput("");
+  };
+
+  const onGramsChange = (raw: string) => {
+    setGramsInput(raw);
+    if (!selectedFood) return;
+    const grams = raw === "" ? 0 : Number(raw);
+    setValues((v) => ({
+      ...v,
+      ...scaleFromCatalog(selectedFood, grams),
+      quantity: raw === "" ? "" : `${raw}g`,
+    }));
+  };
+
   const canSave = values.name.trim().length > 0;
 
   return (
@@ -54,27 +110,75 @@ export default function FoodForm({
       onSubmit={(e) => {
         e.preventDefault();
         if (!canSave) return;
-        onSubmit({ ...values, name: values.name.trim() });
+        onSubmit({ ...values, name: values.name.trim() }, selectedFood !== null);
       }}
       className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900"
     >
-      <div className="grid grid-cols-2 gap-2">
+      {isAdding && selectedFood ? (
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2 dark:border-zinc-700 dark:bg-zinc-800">
+          <span className="truncate text-sm text-zinc-900 dark:text-zinc-50">
+            {selectedFood.name}
+            <span className="ml-1.5 text-xs text-zinc-400">
+              {selectedFood.isImported ? "USDA" : "your food"}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={clearSelection}
+            className="shrink-0 text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-50"
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            autoFocus
+            className={inputClasses}
+            placeholder={isAdding ? "Search or type a food name" : "Food name"}
+            value={values.name}
+            onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+            autoComplete="off"
+          />
+          {results.length > 0 && (
+            <div className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-800">
+              {results.map((food) => (
+                <button
+                  key={food.id}
+                  type="button"
+                  onClick={() => pickFood(food)}
+                  className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm text-zinc-900 hover:bg-zinc-100 dark:text-zinc-50 dark:hover:bg-zinc-700"
+                >
+                  <span className="truncate">{food.name}</span>
+                  <span className="shrink-0 text-xs text-zinc-400">
+                    {food.caloriesPer100g} kcal/100g
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {isAdding && selectedFood ? (
         <input
-          autoFocus
+          type="number"
+          inputMode="decimal"
+          step="any"
+          min="0"
           className={inputClasses}
-          placeholder="Food name"
-          value={values.name}
-          onChange={(e) => setValues((v) => ({ ...v, name: e.target.value }))}
+          placeholder="Grams"
+          value={gramsInput}
+          onChange={(e) => onGramsChange(e.target.value)}
         />
+      ) : (
         <input
           className={inputClasses}
           placeholder="Quantity (e.g. 200g)"
           value={values.quantity}
-          onChange={(e) =>
-            setValues((v) => ({ ...v, quantity: e.target.value }))
-          }
+          onChange={(e) => setValues((v) => ({ ...v, quantity: e.target.value }))}
         />
-      </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {NUTRIENT_FIELDS.map(({ key, label, unit }) => (
