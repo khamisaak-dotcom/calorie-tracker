@@ -29,16 +29,54 @@ function mapFoodItem(row: DbFoodItem): FoodItem {
   };
 }
 
+function isWordBoundaryChar(ch: string | undefined): boolean {
+  return ch === undefined || !/[a-z0-9]/i.test(ch);
+}
+
+/**
+ * Lower tier = better match. Distinguishes a real match ("banana" in
+ * "Bananas, raw") from the query merely being a prefix of a longer fused
+ * word ("egg" in "Eggnog"), so descriptor-heavy or unrelated compound
+ * words don't outrank the food someone actually searched for.
+ */
+function matchTier(name: string, query: string): number {
+  const n = name.toLowerCase();
+  const q = query.toLowerCase().trim();
+  if (n === q) return 0;
+
+  const idx = n.indexOf(q);
+  const isPrefix = idx === 0;
+  const afterIdx = idx + q.length;
+  const after = n[afterIdx];
+  const leftOk = isWordBoundaryChar(n[idx - 1]);
+  const rightOk = isWordBoundaryChar(after) || (after === "s" && isWordBoundaryChar(n[afterIdx + 1]));
+  const isWholeWord = leftOk && rightOk;
+
+  if (isPrefix && isWholeWord) return 1;
+  if (isWholeWord) return 2;
+  if (isPrefix) return 3;
+  return 4;
+}
+
 export async function searchFoodItems(query: string): Promise<FoodItem[]> {
   const { data, error } = await supabase
     .from("foods")
     .select("id, name, calories_per_100g, protein_per_100g, fibre_per_100g, is_imported")
     .ilike("name", `%${query}%`)
-    .order("name", { ascending: true })
-    .limit(25);
+    .limit(500);
 
   if (error) throw error;
-  return (data as DbFoodItem[]).map(mapFoodItem);
+
+  const items = (data as DbFoodItem[]).map(mapFoodItem);
+  items.sort((a, b) => {
+    const tierDiff = matchTier(a.name, query) - matchTier(b.name, query);
+    if (tierDiff !== 0) return tierDiff;
+    const lengthDiff = a.name.length - b.name.length;
+    if (lengthDiff !== 0) return lengthDiff;
+    return a.name.localeCompare(b.name);
+  });
+
+  return items.slice(0, 20);
 }
 
 export async function updateFoodItem(
