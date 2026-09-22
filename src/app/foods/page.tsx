@@ -7,6 +7,18 @@ import { FoodItem, searchFoodItems, updateFoodItem } from "@/lib/foods";
 const inputClasses =
   "w-full rounded-lg border border-zinc-200 bg-transparent px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-900/10 dark:border-zinc-700 dark:text-zinc-50 dark:focus:ring-white/10";
 
+const PER_100G_FIELDS = [
+  { key: "caloriesPer100g", label: "Calories/100g" },
+  { key: "proteinPer100g", label: "Protein/100g" },
+  { key: "fatPer100g", label: "Fat/100g" },
+  { key: "saturatedFatPer100g", label: "Saturated fat/100g" },
+  { key: "carbsPer100g", label: "Carbs/100g" },
+  { key: "sugarPer100g", label: "Sugar/100g" },
+  { key: "fibrePer100g", label: "Fibre/100g" },
+] as const;
+
+type Per100gKey = (typeof PER_100G_FIELDS)[number]["key"];
+
 function EditForm({
   food,
   onSaved,
@@ -17,9 +29,12 @@ function EditForm({
   onCancel: () => void;
 }) {
   const [name, setName] = useState(food.name);
-  const [calories, setCalories] = useState(String(food.caloriesPer100g));
-  const [protein, setProtein] = useState(String(food.proteinPer100g));
-  const [fibre, setFibre] = useState(String(food.fibrePer100g));
+  const [values, setValues] = useState<Record<Per100gKey, string>>(
+    Object.fromEntries(PER_100G_FIELDS.map(({ key }) => [key, String(food[key])])) as Record<
+      Per100gKey,
+      string
+    >
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,9 +44,13 @@ function EditForm({
     try {
       const updated = await updateFoodItem(food.id, {
         name: name.trim(),
-        caloriesPer100g: Number(calories) || 0,
-        proteinPer100g: Number(protein) || 0,
-        fibrePer100g: Number(fibre) || 0,
+        caloriesPer100g: Number(values.caloriesPer100g) || 0,
+        proteinPer100g: Number(values.proteinPer100g) || 0,
+        fatPer100g: Number(values.fatPer100g) || 0,
+        saturatedFatPer100g: Number(values.saturatedFatPer100g) || 0,
+        carbsPer100g: Number(values.carbsPer100g) || 0,
+        sugarPer100g: Number(values.sugarPer100g) || 0,
+        fibrePer100g: Number(values.fibrePer100g) || 0,
       });
       onSaved(updated);
     } catch {
@@ -43,40 +62,20 @@ function EditForm({
   return (
     <div className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900">
       <input className={inputClasses} value={name} onChange={(e) => setName(e.target.value)} />
-      <div className="grid grid-cols-3 gap-2">
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Calories/100g</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="any"
-            className={inputClasses}
-            value={calories}
-            onChange={(e) => setCalories(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Protein/100g</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="any"
-            className={inputClasses}
-            value={protein}
-            onChange={(e) => setProtein(e.target.value)}
-          />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-xs text-zinc-500 dark:text-zinc-400">Fibre/100g</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="any"
-            className={inputClasses}
-            value={fibre}
-            onChange={(e) => setFibre(e.target.value)}
-          />
-        </label>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {PER_100G_FIELDS.map(({ key, label }) => (
+          <label key={key} className="flex flex-col gap-1">
+            <span className="text-xs text-zinc-500 dark:text-zinc-400">{label}</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="any"
+              className={inputClasses}
+              value={values[key]}
+              onChange={(e) => setValues((v) => ({ ...v, [key]: e.target.value }))}
+            />
+          </label>
+        ))}
       </div>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       <div className="flex gap-2 pt-1">

@@ -75,6 +75,10 @@ export default function Home() {
           name: food.name,
           calories: food.calories,
           protein: food.protein,
+          fat: food.fat,
+          saturatedFat: food.saturatedFat,
+          carbs: food.carbs,
+          sugar: food.sugar,
           fibre: food.fibre,
         }).catch(() => {
           // The entry itself saved fine; syncing it into the catalog is best-effort.

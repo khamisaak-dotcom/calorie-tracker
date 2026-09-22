@@ -28,15 +28,28 @@ const nutrients = readCsv("nutrient.csv");
 const energy = nutrients.find((n) => n.name === "Energy" && n.unit_name === "KCAL");
 const protein = nutrients.find((n) => n.name === "Protein");
 const fibre = nutrients.find((n) => n.name === "Fiber, total dietary");
+const fat = nutrients.find((n) => n.name === "Total lipid (fat)");
+const saturatedFat = nutrients.find((n) => n.name === "Fatty acids, total saturated");
+const carbs = nutrients.find((n) => n.name === "Carbohydrate, by difference");
+const sugar = nutrients.find((n) => n.name === "Sugars, Total");
 
-if (!energy || !protein || !fibre) {
+if (!energy || !protein || !fibre || !fat || !saturatedFat || !carbs || !sugar) {
   throw new Error("Could not find one of the required nutrient rows in nutrient.csv");
 }
 console.log(
-  `Found nutrient ids -> calories: ${energy.id}, protein: ${protein.id}, fibre: ${fibre.id}`
+  `Found nutrient ids -> calories: ${energy.id}, protein: ${protein.id}, fibre: ${fibre.id}, ` +
+    `fat: ${fat.id}, saturatedFat: ${saturatedFat.id}, carbs: ${carbs.id}, sugar: ${sugar.id}`
 );
 
-const WANTED_IDS = { [energy.id]: "calories", [protein.id]: "protein", [fibre.id]: "fibre" };
+const WANTED_IDS = {
+  [energy.id]: "calories",
+  [protein.id]: "protein",
+  [fibre.id]: "fibre",
+  [fat.id]: "fat",
+  [saturatedFat.id]: "saturatedFat",
+  [carbs.id]: "carbs",
+  [sugar.id]: "sugar",
+};
 
 console.log("Reading food.csv...");
 const foodRows = readCsv("food.csv");
@@ -50,24 +63,29 @@ console.log(`Found ${foodNames.size} sr_legacy_food entries`);
 
 console.log("Reading food_nutrient.csv (this is the big one)...");
 const nutrientRows = readCsv("food_nutrient.csv");
-const values = new Map(); // fdc_id -> { calories, protein, fibre }
+const BLANK_VALUES = { calories: 0, protein: 0, fibre: 0, fat: 0, saturatedFat: 0, carbs: 0, sugar: 0 };
+const values = new Map(); // fdc_id -> { calories, protein, fibre, fat, saturatedFat, carbs, sugar }
 for (const row of nutrientRows) {
   const key = WANTED_IDS[row.nutrient_id];
   if (!key) continue;
-  const entry = values.get(row.fdc_id) ?? { calories: 0, protein: 0, fibre: 0 };
+  const entry = values.get(row.fdc_id) ?? { ...BLANK_VALUES };
   entry[key] = Number(row.amount) || 0;
   values.set(row.fdc_id, entry);
 }
 
 const rows = [];
 for (const [fdcId, name] of foodNames) {
-  const v = values.get(fdcId) ?? { calories: 0, protein: 0, fibre: 0 };
+  const v = values.get(fdcId) ?? BLANK_VALUES;
   rows.push({
     fdc_id: Number(fdcId),
     name,
     calories_per_100g: v.calories,
     protein_per_100g: v.protein,
     fibre_per_100g: v.fibre,
+    fat_per_100g: v.fat,
+    saturated_fat_per_100g: v.saturatedFat,
+    carbs_per_100g: v.carbs,
+    sugar_per_100g: v.sugar,
     is_imported: true,
   });
 }

@@ -27,10 +27,15 @@ function toFormValues(food?: FoodEntry): FoodFormValues {
 
 function scaleFromCatalog(food: FoodItem, grams: number) {
   const scale = grams / 100;
+  const round1 = (n: number) => Math.round(n * scale * 10) / 10;
   return {
     calories: Math.round(food.caloriesPer100g * scale),
-    protein: Math.round(food.proteinPer100g * scale * 10) / 10,
-    fibre: Math.round(food.fibrePer100g * scale * 10) / 10,
+    protein: round1(food.proteinPer100g),
+    fat: round1(food.fatPer100g),
+    saturatedFat: round1(food.saturatedFatPer100g),
+    carbs: round1(food.carbsPer100g),
+    sugar: round1(food.sugarPer100g),
+    fibre: round1(food.fibrePer100g),
   };
 }
 
